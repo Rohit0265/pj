@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import mongoosedb from '../config/mongo.js';
-import { Webhook } from '../controllers/webhooks.js';
+import { clerkwebhooks } from '../controllers/webhooks.js';
 import serverless from 'serverless-http';
 
 // Initialize express
@@ -18,7 +18,7 @@ app.get('/', (req, res) => {
     res.send('Working hai bhai 😎');
 });
 
-app.post('/clerk', Webhook);
+app.post('/clerk', clerkwebhooks);
 
 // Export serverless handler
 export const handler = serverless(app);
