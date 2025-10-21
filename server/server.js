@@ -1,29 +1,28 @@
-import express from 'express'
-import cors from 'cors'
-import 'dotenv/config'
-import mongoosedb from './config/mongo.js'
-import { Webhook } from './contollers/webhooks.js'
+import express from 'express';
+import cors from 'cors';
+import 'dotenv/config';
+import mongoosedb from './config/mongo.js';
+import { Webhook } from './controllers/webhooks.js'; // fixed spelling: controllers ✅
 
+// Initialize express app
+const app = express();
 
-//express initiallize 
+// Connect to MongoDB
+await mongoosedb(); // make sure you're using Node 18+ or have "type": "module" in package.json
 
-const app = express()
+// Middleware
+app.use(cors());
+app.use(express.json()); // moved express.json() here globally ✅
 
-//db connection
+// Routes
+app.get('/', (req, res) => {
+    res.send('Working hai bhai 😎');
+});
 
-await mongoosedb();
+app.post('/clerk', Webhook);
 
-// initializie middle ware
-
-app.use(cors())
-
-//api making
-
-app.get('/', (req, res) => { res.send("Working hai bhai") })
-app.post('/clerk', express.json(), Webhook)
-
-const PORT = process.env.PORT || 5000
-
+// Start server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`server is runnning ${PORT}`)
-})
+    console.log(`🚀 Server is running on port ${PORT}`);
+});
