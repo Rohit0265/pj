@@ -1,12 +1,10 @@
 import { Webhook } from "svix";
-import user from "../model/user.js";
+import User from "../model/user.js"; // Capitalized for clarity, but must match file
 
-// api clerk
-const clerkwebhooks = async(req, res) => { // fixed parameter name
+const clerkwebhooks = async(req, res) => {
     try {
         const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
-        // verify the webhook
         await whook.verify(JSON.stringify(req.body), {
             "svix-id": req.headers["svix-id"],
             "svix-timestamp": req.headers["svix-timestamp"],
@@ -16,44 +14,34 @@ const clerkwebhooks = async(req, res) => { // fixed parameter name
         const { data, type } = req.body;
 
         switch (type) {
-            case 'user.created':
-                {
-                    const userdata = {
-                        _id: data.id,
-                        email: data.email_addresses[0].email_address,
-                        name: data.first_name + " " + data.last_name,
-                        imageUrl: data.image_url,
-                    };
-                    await user.create(userdata);
-                    res.json({ success: true }); // added success flag
-                    break;
-                }
-            case 'user.updated':
-                {
-                    const userdata = {
-                        email: data.email_address[0].email_address,
-                        name: data.first_name + " " + data.last_name,
-                        imageUrl: data.image_url,
-                    };
-                    await user.findByIdAndUpdate(data.id, userdata);
-                    res.json({ success: true });
-                    break;
-                }
-            case 'user.deleted':
-                {
-                    await user.findByIdAndDelete(data.id);
-                    res.json({ success: true });
-                    break;
-                }
+            case "user.created":
+                await User.create({
+                    _id: data.id,
+                    email: data.email_addresses[0].email_address,
+                    name: `${data.first_name} ${data.last_name}`,
+                    imageUrl: data.image_url
+                });
+                return res.json({ success: true });
+
+            case "user.updated":
+                await User.findByIdAndUpdate(data.id, {
+                    email: data.email_addresses[0].email_address,
+                    name: `${data.first_name} ${data.last_name}`,
+                    imageUrl: data.image_url
+                });
+                return res.json({ success: true });
+
+            case "user.deleted":
+                await User.findByIdAndDelete(data.id);
+                return res.json({ success: true });
+
             default:
-                res.json({ success: true, message: "Unhandled event" }); // added default response
-                break;
+                return res.json({ success: true, message: "Unhandled event" });
         }
+
     } catch (error) {
-        res.json({
-            success: false,
-            message: error.message
-        });
+        console.error(error); // log for debugging
+        return res.json({ success: false, message: error.message });
     }
 };
 
