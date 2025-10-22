@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import mongoosedb from './config/mongo.js';
-import { clerkwebhooks } from './controllers/Webhooks.js';
+import { clerkwebhooks } from './controllers/webhooks.js';
 
 const app = express();
 

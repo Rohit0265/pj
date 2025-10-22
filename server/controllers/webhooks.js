@@ -1,5 +1,5 @@
 import { Webhook } from "svix";
-import user from "../model/User.js";
+import user from "../model/user.js";
 
 // api clerk
 const clerkwebhooks = async(req, res) => { // fixed parameter name
