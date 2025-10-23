@@ -1,23 +1,32 @@
-import { Webhook } from "svix";
-import User from "../model/user.js";
-import bodyParser from "body-parser";
 import express from "express";
+import { Webhook } from "svix";
+import bodyParser from "body-parser";
+import User from "../model/user.js";
 
 const app = express();
 
-// Use raw body parser only for webhook route
+// For all other routes, you can use normal JSON parser
+app.use(express.json());
+
+// Webhook route
 app.post("/api/webhooks/clerk", bodyParser.raw({ type: "application/json" }), async(req, res) => {
     try {
         let payload;
 
-        // Skip signature verification locally
         if (process.env.NODE_ENV === "development") {
-            payload = JSON.parse(req.body.toString());
-            console.log("Skipping Svix verification in local environment");
+            // Local testing: parse raw buffer safely
+            try {
+                payload = JSON.parse(req.body.toString());
+            } catch (parseErr) {
+                console.error("Invalid JSON:", parseErr);
+                return res.status(400).json({ success: false, message: "Invalid JSON" });
+            }
+            console.log("Skipping Svix verification in development");
             console.log("Webhook payload:", payload);
         } else {
-            const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
-            payload = whook.verify(req.body, {
+            // Production: verify signature
+            const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
+            payload = wh.verify(req.body, {
                 "svix-id": req.headers["svix-id"],
                 "svix-timestamp": req.headers["svix-timestamp"],
                 "svix-signature": req.headers["svix-signature"]
@@ -53,8 +62,8 @@ app.post("/api/webhooks/clerk", bodyParser.raw({ type: "application/json" }), as
         }
 
     } catch (error) {
-        console.error(error);
-        return res.json({ success: false, message: error.message });
+        console.error("Webhook handler error:", error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 });
 
