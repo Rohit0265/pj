@@ -14,6 +14,10 @@ app.use(cors());
 
 // Routes
 app.get('/', (req, res) => res.send('Working hai bhai 😎'));
-app.post('/clerk', clerkwebhooks);
+
+// 🛑 CRITICAL FIX: Insert express.raw() middleware ONLY for the webhook route.
+// This ensures that req.body is a raw Buffer/string (unparsed), which is required
+// by the svix library for signature verification.
+app.post('/clerk', express.raw({ type: 'application/json' }), clerkwebhooks);
 
 export default app;
