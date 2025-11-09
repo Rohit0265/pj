@@ -8,8 +8,8 @@ export const getUserData = async(req, res) => {
     try {
         console.log("Request Object Keys:", Object.keys(req));
 
-        const userIdFromAuth = req.userId; // Or req.auth.userId, etc.
-        const user = await User.findById(userIdFromAuth);
+        const clerkId = req.auth.userId; // Clerk user ID
+        const user = await User.findOne({ clerkId });
         // const user = await User.findById(req.userId);
         if (!user) {
             return res.status(404).json({ success: false, message: "User not found" });
