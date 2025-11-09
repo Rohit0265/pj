@@ -21,21 +21,26 @@ export const getAllcourse = async(req, res) => {
 //get course by id
 
 export const getCourseId = async(req, res) => {
-    const { id } = req.params
+    const { id } = req.params;
 
     try {
-        const courseData = await Course.findById(id).populate({ path: 'educator' });
+        const courseData = await Course.findById(id).populate({ path: "educator" });
 
-        //remove lectureurl if ispreview free is false
+        if (!courseData) {
+            return res.status(404).json({ success: false, message: "Course not found" });
+        }
+
+        // Remove lecture URL if preview is not free
         courseData.courseContent.forEach(chapter => {
             chapter.chapterContent.forEach(lecture => {
-                if (!lecture.isPreview) {
+                if (!lecture.isPreviewFree) { // make sure your schema uses isPreviewFree
                     lecture.lectureUrl = "";
                 }
-            })
-        })
-        res.json({ success: true, courseData })
+            });
+        });
+
+        res.json({ success: true, course: courseData }); // ✅ standardized key name
     } catch (error) {
-        res.json({ success: false, error: message })
+        res.status(500).json({ success: false, message: error.message });
     }
-}
+};

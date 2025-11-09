@@ -1,24 +1,59 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { AppContext } from '../../context/Appcontext'
 import Fotter from '../../components/students/Fotter'
 import {Line} from 'rc-progress'
+import { toast } from 'react-toastify'
 
 
 function Enrollment() {
 
-  const { isEnrolled, courseduration,navigate } = useContext(AppContext)
+  const { isEnrolled, courseduration,navigate ,userData,backendUrl,fetchCourses,totalnoLectures,getToken} = useContext(AppContext)
   const[progress,setProgress] = useState([
-    {lectureCompleter:2 , totalLectures : 4},
-    {lectureCompleter:0 , totalLectures : 4},
-    {lectureCompleter:4 , totalLectures : 4},
-    {lectureCompleter:3 , totalLectures : 4},
-    {lectureCompleter:1 , totalLectures : 4},
-    {lectureCompleter:4 , totalLectures : 7},
-    {lectureCompleter:2 , totalLectures : 3},
-    {lectureCompleter:3 , totalLectures : 8},
-    {lectureCompleter:7 , totalLectures : 12},
   ])
 
+const getCourseProgress = async () => {
+  try {
+    const token = await getToken();
+    console.log("Token:", token); // Debug
+
+    const tempProgressArray = await Promise.all(
+      isEnrolled.map(async (course) => {
+        const { data } = await axios.post(
+          `${backendUrl}/api/user/get-course-progress`,
+          { course: course._id },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const totalLectures = calculateNoofLectures(course);
+        const lectureCompleted = data.progressData
+          ? data.progressData.lectureCompleted.length
+          : 0;
+        return { totalLectures, lectureCompleted };
+      })
+    );
+    setProgress(tempProgressArray);
+  } catch (error) {
+    toast.error(error.message);
+  }
+};
+
+useEffect(() => {
+  if (isEnrolled && isEnrolled.length > 0) {
+    getCourseProgress();
+  }
+}, [isEnrolled]);
+
+
+useEffect(()=>{
+  if(userData){
+    fetchCourses()
+  }
+},[userData])
+
+useEffect(()=>{
+  if(enrolledCourses.length>0){
+    getCourseProgress()
+  }
+},[userData])
   return (
     <div>
       <div className='md:px-32 px-8'>

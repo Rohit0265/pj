@@ -3,10 +3,14 @@ import { dummyCourses } from '../assets/assets/assets';
 import { useNavigate } from 'react-router-dom';
 import humanizeDuration from "humanize-duration";
 import {useAuth,useUser} from "@clerk/clerk-react"
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
 export const AppContext = createContext();
 
 export const AppContextProvider = (props)=>{
+
+    const backendUrl = import.meta.env.VITE_BACKEND_URL
 
     const currency = import.meta.env.VITE_CURRENCY;
 
@@ -16,19 +20,22 @@ export const AppContextProvider = (props)=>{
     const {user}=useUser();
 
     //fucntion rating find karne ke liye
+const findRating = (course) => {
+  // 🩵 Safety checks first
+  if (!course || !Array.isArray(course.courseRatings) || course.courseRatings.length === 0) {
+    return 0;
+  }
 
-    const findRating = (course)=>{
-        if(course.courseRatings.length === 0){
-            return 0;
-        }
-        let totalRating = 0;
-    
-        course.courseRatings.forEach(rating => {
-                totalRating += rating.rating
-            });
-        return (totalRating / course.courseRatings.length);
-        
-    }
+  // 🧮 Calculate total rating safely
+  const totalRating = course.courseRatings.reduce(
+    (sum, rating) => sum + (rating?.rating || 0),
+    0
+  );
+
+  // 🔢 Return average (rounded down)
+  return Math.floor(totalRating / course.courseRatings.length);
+};
+
 
     //time dduraartion for lectires finding
 
@@ -70,31 +77,83 @@ export const AppContextProvider = (props)=>{
     const [isEducator,seIsEducator] = useState([]);
 
     const [isEnrolled,setIsEnrolled] = useState([]);
+
+    const [userData,setuserData] = useState(null)
     
 
     const enrollment = async ()=>{
-        setIsEnrolled(dummyCourses)
+        try {
+            const token = await getToken();;
+            const {data}= await axios.get(backendUrl+'/api/user/enrolled-courses',{headers:{Authorization:`Bearer ${token}`}})
+    
+            if(data.success){
+                setIsEnrolled(data.enrolledCourses.reverse())
+            }else{
+                toast.error(data.messgae)
+            }
+            
+        } catch (error) {
+            toast.error(error.message)
+        }
     }
 
-    const fetchCourses = async ()=>{
-         setAllCourse(dummyCourses)
+const fetchUserdata = async () => {
+  try {
+    const token = await getToken();
+    const { data } = await axios.get(backendUrl+'/api/user/data', {
+      headers: { Authorization: `Bearer ${token}` }});
+      
+
+    if (data.success) {
+      setuserData(data.user);
+      if (data.user.role === "educator") seIsEducator(true);
+    } else {
+      toast.error(data.message);
     }
+
+  } catch (error) {
+    console.error("❌ Error fetching user data:", error);
+  }
+};
+
+useEffect(()=>{
+    if(user){
+      // console.log(user);
+       console.log("🧑‍💻 userData in context:", userData);
+       
+console.log("📡 Fetching user data from:", `${backendUrl}/api/user/data`);
+        fetchUserdata()
+        enrollment()
+    }
+
+},[user]);
+
+const fetchCourses = async () => {
+  try {
+    console.log("📡 Fetching all courses from:", `${backendUrl}/api/course/all`);
+    const { data } = await axios.get(`${backendUrl}/api/course/all`);
+    console.log("✅ Backend response:", data);
+
+    if (data.success) {
+      setAllCourse(data.course || data.courses || []);
+      console.log("🎯 Loaded courses:", data.course || data.courses);
+    } else {
+      toast.error(data.message || "Failed to fetch courses");
+    }
+  } catch (error) {
+    console.error("🚨 FetchCourses failed:", error);
+    toast.error(error.message);
+  }
+};
+
+
     useEffect(()=>{
         fetchCourses()
-        enrollment()
     },[])
-    const logToken = async ()=>{
-        console.log(await getToken());
-    }
-    useEffect(()=>{
-        if(user){
-            logToken();
-        }
 
-    },[user]);
 
     const value = {
-            currency,allCourse,navigate,findRating,isEducator,seIsEducator,totalnoLectures,courseduration,chapterduration,isEnrolled,enrollment
+            currency,allCourse,navigate,findRating,isEducator,seIsEducator,totalnoLectures,courseduration,chapterduration,isEnrolled,enrollment,backendUrl,userData,setuserData,getToken,fetchCourses
     }
     return(
 

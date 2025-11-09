@@ -234,13 +234,17 @@
 
 
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import uniqid from 'uniqid';
 import Quill from "quill";
 import "quill/dist/quill.snow.css"; // IMPROVEMENT: Import Quill's CSS
 import { assets } from "../../assets/assets/assets";
+import { AppContext } from "../../context/Appcontext";
+import axios from "axios";
+import { toast } from "react-toastify";
 
 function AddCourse() {
+  const {backendUrl,getToken} = useContext(AppContext)
   // Refs for the Quill editor
   const quillref = useRef(null);
   const editorref = useRef(null);
@@ -317,52 +321,89 @@ function AddCourse() {
   };
 
   // --- Form Submission Handlers ---
-  const handleAddLectureSubmit = () => {
-    if (!lectureDetails.lectureTitle || !lectureDetails.lectureDuration || !lectureDetails.lectureUrl) {
-      alert("Please fill in all lecture fields.");
-      return;
+const handleAddLectureSubmit = () => {
+  if (!lectureDetails.lectureTitle || !lectureDetails.lectureDuration || !lectureDetails.lectureUrl) {
+    alert("Please fill in all lecture fields.");
+    return;
+  }
+
+  // Add the new lecture to the correct chapter immutably
+  setChapters(chapters.map(chapter => {
+    if (chapter.chapterId === currentChapterId) {
+      const newLecture = {
+        ...lectureDetails,
+        lectureId: uniqid(),
+        lectureOrder: chapter.chapterContent.length + 1, // ✅ Added lecture order
+      };
+      return { ...chapter, chapterContent: [...chapter.chapterContent, newLecture] };
     }
-    
-    // IMPROVEMENT: Add the new lecture to the correct chapter immutably
-    setChapters(chapters.map(chapter => {
-      if (chapter.chapterId === currentChapterId) {
-        const newLecture = { ...lectureDetails, lectureId: uniqid() };
-        return { ...chapter, chapterContent: [...chapter.chapterContent, newLecture] };
-      }
-      return chapter;
-    }));
+    return chapter;
+  }));
 
-    // Reset form and close popup
-    setShowPopup(false);
-    setCurrentChapterId(null);
-    setLectureDetails({
-      lectureTitle: "",
-      lectureDuration: "",
-      lectureUrl: "",
-      isPreviewFree: false,
-    });
-  };
+  // Reset form and close popup
+  setShowPopup(false);
+  setCurrentChapterId(null);
+  setLectureDetails({
+    lectureTitle: "",
+    lectureDuration: "",
+    lectureUrl: "",
+    isPreviewFree: false,
+  });
+};
 
-  const handleCourseSubmit = (e) => {
-    e.preventDefault(); // Prevent page reload on form submission
-    
-    // IMPROVEMENT: Get content from Quill editor
+
+ const handleCourseSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
     const courseDescription = quillref.current.root.innerHTML;
 
-    // Consolidate all course data
+    if (!image) {
+      toast.error("Thumbnail Not Selected");
+      return;
+    }
+
+    if (chapters.length === 0) {
+      toast.error("Please add at least one chapter.");
+      return;
+    }
+
     const courseData = {
       courseTitle,
       courseDescription,
-      coursePrice: parseFloat(coursePrice),
-      discount: parseInt(discount),
-      thumbnail: image,
-      chapters,
+      coursePrice: Number(coursePrice),
+      discount: Number(discount),
+      courseContent: chapters,
     };
-    
-    console.log("Course Data Submitted:", courseData);
-    // Here you would typically send `courseData` to your backend API
-    alert("Course data logged to the console!");
-  };
+
+    const formData = new FormData();
+    formData.append("courseData", JSON.stringify(courseData));
+    formData.append("image", image);
+
+    const token = await getToken();
+
+    const { data } = await axios.post(`${backendUrl}/api/educator/add-course`, formData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+console.log("Backend URL:", backendUrl);
+console.log("Final Endpoint:", `${backendUrl}/api/educator/add-course`);
+
+    if (data.success) {
+      toast.success(data.message);
+      setCourseTitle("");
+      setCoursePrice("");
+      setDiscount("");
+      setImage(null);
+      setChapters([]);
+      if (quillref.current) quillref.current.root.innerHTML = "";
+    } else {
+      toast.error(data.message);
+    }
+  } catch (error) {
+    toast.error(error.message);
+  }
+};
+
 
   return (
     <div className="h-screen overflow-y-auto flex flex-col items-start md:p-8 p-4">

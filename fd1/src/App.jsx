@@ -3,6 +3,7 @@ import CourseDetail from "./pages/students/CourseDetail"
 import Enrollment from "./pages/students/Enrollment"
 import Home from "./pages/students/home"
 import "quill/dist/quill.snow.css";
+  import { ToastContainer, toast } from 'react-toastify';
 import { Route,Routes, useMatch } from 'react-router-dom'
 import Loading from "./pages/students/Loading"
 import Player from "./pages/students/Player"
@@ -26,6 +27,7 @@ const App = () => {
 
   return (
     <>
+    <ToastContainer/>
     {!eductor && <Navbar/>}
     <Routes>
       {/* YE STUDENT KE LIYE  */}
@@ -34,7 +36,7 @@ const App = () => {
       <Route path='/Course-List/:id' element ={<CourseList/>}/>
       <Route path='/Course-Detail/' element ={<CourseDetail/>}/>
       <Route path='/Course-Detail/:id' element ={<CourseDetail/>}/>
-      <Route path='/Enrollment' element ={<Enrollment/>}/>
+      <Route path='/my-enrollment' element ={<Enrollment/>}/>
       <Route path='/Loading' element ={<Loading/>}/>
       <Route path='/Player/:CourseId' element ={<Player/>}/>
       <Route path='/Player' element ={<Player/>}/>

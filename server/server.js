@@ -35,7 +35,7 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import mongoosedb from './config/mongo.js';
-import { clerkMiddleware } from '@clerk/express'
+import { clerkMiddleware } from '@clerk/express';
 import { clerkwebhooks, stripeWebhooks } from './controllers/webhooks.js';
 import educator from './routes/educatorRout.js';
 import connectClodinary from './config/Cloudnary.js';
@@ -45,27 +45,40 @@ import userRouter from './routes/userRoutes.js';
 
 const app = express();
 
-// Connect to MongoDB
-await mongoosedb();
-await connectClodinary();
+// 🧠 Connect to MongoDB and Cloudinary
+await mongoosedb().catch(console.error);
+await connectClodinary().catch(console.error);
 
-// Middleware
+
+// ✅ Always start with CORS
+// app.use(cors());
+// import cors from "cors";
+
 app.use(cors());
 
-// ✅ FIX: Place the global JSON parser here so all routes can use it!
-app.use(express.json());
+// ⚠️ Do NOT use express.json() before raw webhook routes!
+// Stripe & Clerk webhooks require raw body for signature verification
 
+// 🔔 Webhook routes (must come before any JSON middleware)
+app.post('/clerk', express.raw({ type: 'application/json' }), clerkwebhooks);
+app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
+
+// ✅ Now apply global middleware for normal routes
+app.use(express.json());
 app.use(clerkMiddleware());
 
-// Routes
+// 🌐 API routes
 app.get('/', (req, res) => res.send('Working hai bhai 😎'));
-app.post('/clerk', express.raw({ type: "application/json" }), clerkwebhooks);
 app.use('/api/educator', protextEducator, educator);
-app.use('/api/course', express.json(), courseRouter)
-app.use('/api/user', express.json(), userRouter)
-app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks)
+app.use('/api/course', courseRouter);
+app.use('/api/user', userRouter);
+app.use((req, res) => {
+    console.log("⚠️ Unhandled route:", req.path);
+    res.status(404).send("Route not found: " + req.path);
+});
+// 🚀 Start server
 app.listen(process.env.PORT, () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+    console.log(`✅ Server is running on port ${process.env.PORT}`);
 });
 
 export default app;

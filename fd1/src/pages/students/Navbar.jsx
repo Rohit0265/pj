@@ -8,10 +8,31 @@ function Navbar() {
 
   const {openSignIn} = useClerk();
   const {user} = useUser();
-  const {navigate} = useContext(AppContext);
+  const {navigate,isEducator,backendUrl,setIsEducator,getToken} = useContext(AppContext);
   const Navc = location.pathname.includes("/educator")
 
-  const {isEducator}  = useContext(AppContext)  
+  // const {}  = useContext(AppContext)  
+  const becomeEducator = async ()=>{
+    try {
+      if(isEducator){
+        navigate('/educator')
+        return;
+      }
+      const token = await getToken()
+      const {data} = await axios.get(backendUrl + 'api/educator/update-role',{headers:{Authorization : `Bearer ${token}` }})
+
+
+      if(data.success){
+        setIsEducator(true)
+        toast.success(data.message)
+      }else{
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(data.message)
+      
+    }
+  }
   return (
 
     <>
@@ -21,7 +42,7 @@ function Navbar() {
         <div className='hidden md:flex items-center gap-20'>
             <div className='gap-5 flex font-bold'> 
                 { user && <>
-                <button onClick={()=>{navigate("/educator")}} className='cursor-pointer'>{isEducator ? "Educator Dashboard":"Become Educator"}</button>
+                <button className='cursor-pointer' onClick={becomeEducator}>{isEducator ? "Educator Dashboard":"Become Educator"}</button>
                 |<Link to={'/my-enrollment'}>My Enrollment</Link>
                 </>
                 }
@@ -37,9 +58,8 @@ function Navbar() {
         <div className='md:hidden items-center flex gap-10'>
                 <div className='gap-5 flex font-bold'> 
                   {user  && <>
-                    <button>Become Educator</button>
+                    <button onClick={isEducator}>{isEducator ? 'Educator Dashboard': 'Become Educator'}</button>
                     |<Link to={'/my-enrollment'}>My Enrollment</Link>
-
                   </>
                   }
             </div>

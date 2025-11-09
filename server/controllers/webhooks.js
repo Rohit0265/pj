@@ -66,59 +66,84 @@ import { Endpoint } from "svix/dist/api/endpoint.js";
 import { Purchase } from "../model/purchase.js";
 import Course from "../model/modelSchema.js";
 
+
 export const clerkwebhooks = async(req, res) => {
     try {
         let payload;
 
-        // 🧩 Local testing — skip Svix signature verification
+        // 🧩 Local development — skip Svix signature verification
         if (process.env.NODE_ENV === "development") {
             try {
-                payload = JSON.parse(req.body.toString());
+                // Clerk sends raw body (Buffer) because of express.raw()
+                if (Buffer.isBuffer(req.body)) {
+                    payload = JSON.parse(req.body.toString("utf8"));
+                } else if (typeof req.body === "string") {
+                    payload = JSON.parse(req.body);
+                } else {
+                    throw new Error("Expected raw Buffer or string body");
+                }
+
+                console.log("⚠️ Local mode: Skipping Svix verification");
             } catch (err) {
-                console.error("❌ Invalid JSON body in local mode:", err);
+                console.error("❌ Invalid JSON body:", err);
                 return res.status(400).json({ success: false, message: "Invalid JSON body" });
             }
-            console.log("⚠️ Skipping Svix signature verification (local mode)");
         }
-        // 🧩 Production — verify signature with Svix
+
+        // 🧩 Production — verify signature using Svix
         else {
-            const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
-            payload = wh.verify(req.body, {
-                "svix-id": req.headers["svix-id"],
-                "svix-timestamp": req.headers["svix-timestamp"],
-                "svix-signature": req.headers["svix-signature"]
-            });
+            try {
+                const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
+                payload = wh.verify(req.body, {
+                    "svix-id": req.headers["svix-id"],
+                    "svix-timestamp": req.headers["svix-timestamp"],
+                    "svix-signature": req.headers["svix-signature"],
+                });
+            } catch (err) {
+                console.error("❌ Webhook verification failed:", err.message);
+                return res.status(400).json({
+                    success: false,
+                    message: "Webhook verification failed",
+                });
+            }
         }
 
+        // ✅ Process the event
         const { type, data } = payload;
+        console.log("📩 Clerk event received:", type);
 
-        console.log("📩 Clerk event:", type);
+        const getEmail = () => {
+            if (data.email_addresses && data.email_addresses.length > 0) {
+                return data.email_addresses[0].email_address;
+            }
+            return "";
+        };
 
-        // 🧠 Handle Clerk events
+        const name = `${data.first_name || ""} ${data.last_name || ""}`.trim();
+
         switch (type) {
             case "user.created":
                 await User.create({
-                    _id: data.id,
-                    email: data.email_addresses[0].email_address,
-                    name: `${data.first_name} ${data.last_name}`,
-                    imageUrl: data.image_url
+                    clerkId: data.id,
+                    email: getEmail(),
+                    name: name,
+                    imageUrl: data.image_url || "",
                 });
+                console.log("✅ User created:", getEmail());
                 break;
 
             case "user.updated":
-                await User.findByIdAndUpdate(data.id, {
-                    email: data.email_addresses[0].email_address,
-                    name: `${data.first_name} ${data.last_name}`,
-                    imageUrl: data.image_url
-                });
+                await User.findOneAndUpdate({ clerkId: data.id }, { email: getEmail(), name: name, imageUrl: data.image_url || "" }, { new: true });
+                console.log("🔁 User updated:", getEmail());
                 break;
 
             case "user.deleted":
-                await User.findByIdAndDelete(data.id);
+                await User.findOneAndDelete({ clerkId: data.id });
+                console.log("🗑️ User deleted:", data.id);
                 break;
 
             default:
-                console.log("⚠️ Unhandled event type:", type);
+                console.log("⚠️ Unhandled Clerk event type:", type);
         }
 
         return res.status(200).json({ success: true });
@@ -127,6 +152,10 @@ export const clerkwebhooks = async(req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+
+
+
 
 
 
@@ -150,7 +179,7 @@ export const stripeWebhooks = async(request, response) => {
     console.log("⚡ Stripe Event Type:", event.type);
 
     switch (event.type) {
-        case "checkout.session.completed":
+        case "payment_intent.succeeded":
             {
                 const session = event.data.object;
                 const { purchaseId } = session.metadata;

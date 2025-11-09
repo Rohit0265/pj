@@ -6,17 +6,20 @@ import { CourseProgress } from "../model/courseProgress.js";
 
 export const getUserData = async(req, res) => {
     try {
-        const userId = req.auth.userId;
-        const user = await User.findById(userId);
+        console.log("Request Object Keys:", Object.keys(req));
 
+        const userIdFromAuth = req.userId; // Or req.auth.userId, etc.
+        const user = await User.findById(userIdFromAuth);
+        // const user = await User.findById(req.userId);
         if (!user) {
-            return res.json({ success: false, message: 'User Not Found' })
+            return res.status(404).json({ success: false, message: "User not found" });
         }
-        res.json({ success: true, user })
+        res.json({ success: true, user });
     } catch (error) {
-        res.json({ success: false, message: error.message })
+        res.status(500).json({ success: false, message: error.message });
     }
-}
+};
+
 
 //user enrolled courses
 
@@ -38,53 +41,80 @@ export const userEnrolledCourses = async(req, res) => {
 
 //now for payment gateway
 
+// import Stripe from "stripe";
+// import User from "../model/user.js";
+// import Course from "../model/modelSchema.js";
+// import { Purchase } from "../model/purchase.js";
+
 export const purchaseCourse = async(req, res) => {
     try {
         const { courseId } = req.body;
-        const origin = req.headers.origin
-        const userId = req.auth.userId
-        const userData = await User.findById(userId)
+        const origin = req.headers.origin;
+        const userId = req.auth.userId;
+
+        const userData = await User.findById(userId);
         const courseData = await Course.findById(courseId);
 
         if (!userData || !courseData) {
-            return res.json({ success: false, message: 'Data Not Found' })
+            return res.json({ success: false, message: "Data Not Found" });
         }
-        const purchaseData = {
+
+        // 💰 Calculate amount properly as a number
+        const amount =
+            courseData.coursePrice -
+            (courseData.discount * courseData.coursePrice) / 100;
+
+        // 🧾 Save purchase record
+        const newPurchase = await Purchase.create({
             courseId: courseData._id,
             userId,
-            amount: (courseData.coursePrice - courseData.discount * courseData.coursePrice / 100).toFixed(2),
-        }
+            amount: Number(amount.toFixed(2)), // ✅ Ensure numeric value
+            status: "pending",
+        });
 
-        const newPurchase = await Purchase.create(purchaseData)
+        console.log("🧾 New Purchase ID:", newPurchase._id);
 
-        //stripe Initializeeee
-        const stripeInstaance = new Stripe(process.env.STRIPE_SECRET_KEY)
-        const currency = process.env.CURRENCY.toLowerCase()
+        // ⚙️ Initialize Stripe
+        const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+
         const line_items = [{
             price_data: {
-                currency,
+                currency: process.env.CURRENCY.toLowerCase(),
                 product_data: {
-                    name: courseData.courseTitle
+                    name: courseData.courseTitle,
                 },
-                unit_amount: Math.floor(newPurchase.amount) * 100
+                unit_amount: Math.round(amount * 100), // ✅ Always integer (cents)
             },
-            quantity: 1
-        }]
+            quantity: 1,
+        }, ];
 
-        const session = await stripeInstaance.checkout.sessions.create({
+        // 🧠 Make sure metadata is a plain object with string values only
+        const metadata = { purchaseId: String(newPurchase._id) };
+        console.log("🎯 Sending metadata:", metadata);
+
+        // ✅ Create checkout session
+        const session = await stripeInstance.checkout.sessions.create({
             success_url: `${origin}/loading/my-enrollments`,
             cancel_url: `${origin}`,
-            line_items: line_items,
-            mode: 'payment',
-            metadata: {
-                purchaseId: newPurchase._id.toString()
-            }
-        })
+            line_items,
+            mode: "payment",
+            metadata,
+        });
+
+        console.log(
+            "✅ Created Stripe session:",
+            session.id,
+            "metadata:",
+            session.metadata
+        );
+
         res.json({ success: true, session_url: session.url });
     } catch (error) {
-        res.json({ success: false, message: error.message })
+        console.error("❌ purchaseCourse error:", error);
+        res.json({ success: false, message: error.message });
     }
-}
+};
+
 
 //update user course
 
