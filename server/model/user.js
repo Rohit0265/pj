@@ -1,24 +1,15 @@
 import mongoose, { Schema } from "mongoose";
 
 const userSchema = new Schema({
-    _id: { type: String, required: true },
-    name: { type: String, required: true },
-    email: {
-        type: String,
-        required: true
-    },
-    imageUrl: {
-        type: String,
-        required: true
-    },
+    clerkId: { type: String, required: true, unique: true }, // Clerk's user ID
+    name: { type: String, default: "" },
+    email: { type: String, default: "" },
+    imageUrl: { type: String, default: "" },
     enrolledCourses: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Course'
-    }],
+        ref: "Course",
+    }, ],
+}, { timestamps: true });
 
-}, { timestamps: true })
-
-
-const User = mongoose.model('User', userSchema);
-
+const User = mongoose.model("User", userSchema);
 export default User;
