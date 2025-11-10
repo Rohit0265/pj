@@ -8,6 +8,7 @@ import humanizeDuration from "humanize-duration";
 import Loading from "../../components/students/Loading";
 import { toast } from "react-toastify";
 import axios from "axios";
+import { getCourseId } from "../../../../server/controllers/courseContoller";
 
 function CourseDetail() {
   const { id } = useParams();
@@ -47,26 +48,34 @@ function CourseDetail() {
   const updowm = (index) => {
     setarrow((prev) => ({ ...prev, [index]: !prev[index] }));
   };
-
-  const EnrollCourse = async () => {
+const { id: courseId } = useParams();
+ const EnrollCourse = async () => {
     try {
-      if (!userData) return toast.warn("Login to Enroll");
-      if (isAlreadyEnrolled) return toast.warn("Already Enrolled");
-
+      console.log(courseId)
       const token = await getToken();
-      const { data } = await axios.post(
+      
+      const response = await axios.post(
         `${backendUrl}/api/user/purchase`,
-        { courseId: coursedata._id },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { courseId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
-      if (data.success) {
-        window.location.replace(data.session_url);
+      console.log("✅ Purchase API response:", response.data);
+
+      if (response.data.success && response.data.session_url) {
+        // ✅ Redirect user to Stripe payment page
+        window.location.href = response.data.session_url;
       } else {
-        toast.error(data.message);
+        alert(response.data.message || "Something went wrong while creating checkout.");
       }
+
     } catch (error) {
-      toast.error(error.message);
+      console.error("❌ Enrollment failed:", error.response?.data || error.message);
+      alert("Payment session could not be created.");
     }
   };
 

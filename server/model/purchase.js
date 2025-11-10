@@ -7,8 +7,8 @@ const purchaseSchemaa = new mongoose.Schema({
         required: true
     },
     userId: {
-        type: String,
-        ref: 'User',
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
         required: true
     },
     amount: { type: Number, required: true },

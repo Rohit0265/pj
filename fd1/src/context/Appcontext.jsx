@@ -11,9 +11,9 @@ export const AppContext = createContext();
 export const AppContextProvider = (props)=>{
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL
-
+const [error,setError]= useState([])
     const currency = import.meta.env.VITE_CURRENCY;
-
+const { isLoaded, isSignedIn} = useAuth();
     const navigate = useNavigate();
 
     const {getToken} = useAuth();
@@ -74,7 +74,7 @@ const findRating = (course) => {
 
     const [allCourse,setAllCourse] = useState([]);
     
-    const [isEducator,seIsEducator] = useState([]);
+    const [isEducator,seIsEducator] = useState(false);
 
     const [isEnrolled,setIsEnrolled] = useState([]);
 
@@ -97,24 +97,46 @@ const findRating = (course) => {
         }
     }
 
-const fetchUserdata = async () => {
-  try {
-    const token = await getToken();
-    const { data } = await axios.get(backendUrl+'/api/user/data', {
-      headers: { Authorization: `Bearer ${token}` }});
-      
+// ✅ Corrected states
+// const [userData, setuserData] = useState(null);
+// const [isEducator, setIsEducator] = useState(false);
+// const [isEnrolled, setIsEnrolled] = useState([]);
 
-    if (data.success) {
-      setuserData(data.user);
-      if (data.user.role === "educator") seIsEducator(true);
-    } else {
-      toast.error(data.message);
+// ✅ Corrected function
+// const fetchUserData = async () => {
+const fetchUserData = async () => {
+      try {
+        const token = await getToken();
+        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/data`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.data.success) {
+          setUser(res.data.user);
+        } else {
+          setError(res.data.message || "Failed to fetch user data");
+        }
+      } catch (err) {
+        console.error("User fetch error:", err.response?.data || err.message);
+        setError(err.response?.data?.message || "Failed to fetch user data");
+      }
     }
 
-  } catch (error) {
-    console.error("❌ Error fetching user data:", error);
+
+// ✅ useEffect to load user
+useEffect(() => {
+  console.log("🧠 isLoaded:", isLoaded);
+  console.log("🔐 isSignedIn:", isSignedIn);
+  if (isLoaded && isSignedIn) {
+    console.log("✅ Fetching user data...");
+    fetchUserData();
+  } else {
+    console.log("🚫 Not signed in — clearing user data");
+    setuserData(null);
   }
-};
+}, [isLoaded, isSignedIn]);
 
 useEffect(()=>{
     if(user){
@@ -122,7 +144,7 @@ useEffect(()=>{
        console.log("🧑‍💻 userData in context:", userData);
        
 console.log("📡 Fetching user data from:", `${backendUrl}/api/user/data`);
-        fetchUserdata()
+        // fetchUserData()
         enrollment()
     }
 
@@ -130,21 +152,33 @@ console.log("📡 Fetching user data from:", `${backendUrl}/api/user/data`);
 
 const fetchCourses = async () => {
   try {
-    console.log("📡 Fetching all courses from:", `${backendUrl}/api/course/all`);
-    const { data } = await axios.get(`${backendUrl}/api/course/all`);
+    const url = `${backendUrl}/api/course/all`;
+    console.log("📡 Fetching all courses from:", url);
+
+    const response = await axios.get(url, { timeout: 10000 }); // 10s timeout
+    const data = response?.data;
+
     console.log("✅ Backend response:", data);
 
-    if (data.success) {
-      setAllCourse(data.course || data.courses || []);
-      console.log("🎯 Loaded courses:", data.course || data.courses);
+    if (data && data.success) {
+      const courses = data.course || data.courses || [];
+      setAllCourse(courses);
+      console.log(`🎯 Loaded ${courses.length} courses`);
     } else {
-      toast.error(data.message || "Failed to fetch courses");
+      const message = data?.message || "Failed to fetch courses";
+      console.warn("⚠️ Course fetch failed:", message);
+      toast.error(message);
     }
   } catch (error) {
     console.error("🚨 FetchCourses failed:", error);
-    toast.error(error.message);
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      "Unexpected error while fetching courses";
+    toast.error(message);
   }
 };
+
 
 
     useEffect(()=>{
