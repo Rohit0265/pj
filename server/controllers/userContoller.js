@@ -81,7 +81,7 @@ export const purchaseCourse = async(req, res) => {
         const origin = req.headers.origin || "http://localhost:5173";
         const clerkId = req.auth.userId;
 
-        // 1️⃣ Find user using clerkId
+        // 1️⃣ Find user
         const userData = await User.findOne({ clerkId });
         if (!userData) {
             return res.json({ success: false, message: "User not found" });
@@ -93,46 +93,67 @@ export const purchaseCourse = async(req, res) => {
             return res.json({ success: false, message: "Course not found" });
         }
 
-        // 3️⃣ Create Stripe session
-        const stripeInstance = new Stripe(process.env.STRIPE_SECRET);
+        // 3️⃣ Calculate amount BEFORE using it
+        const amount =
+            courseData.coursePrice -
+            (courseData.discount * courseData.coursePrice) / 100;
 
+        if (!amount || isNaN(amount)) {
+            return res.json({
+                success: false,
+                message: "Invalid course amount",
+            });
+        }
+
+        // 4️⃣ Create Purchase FIRST (so we have purchaseId)
+        const newPurchase = await Purchase.create({
+            userId: userData._id,
+            courseId: courseData._id,
+            amount: Number(amount.toFixed(2)),
+            status: "pending",
+            events: [],
+        });
+
+        const purchaseIdStr = String(newPurchase._id);
+
+        // 5️⃣ Create Stripe instance
+        const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+        // 6️⃣ Create Stripe checkout session
         const session = await stripeInstance.checkout.sessions.create({
             success_url: origin + "/loading/my-enrollments",
             cancel_url: origin,
+            mode: "payment",
             line_items: [{
                 price_data: {
                     currency: "inr",
                     product_data: { name: courseData.courseTitle },
-                    unit_amount: Math.round(amount * 100),
+                    unit_amount: Math.round(amount * 100), // FIXED
                 },
                 quantity: 1,
-            }],
-            mode: "payment",
+            }, ],
             metadata: {
                 purchaseId: purchaseIdStr,
             },
             client_reference_id: purchaseIdStr,
         });
 
+        // 7️⃣ Save Stripe session ID
+        newPurchase.stripeSessionId = session.id;
+        await newPurchase.save();
 
-        // 4️⃣ Create Purchase using MongoDB userId (NOT clerkId)
-        await Purchase.create({
-            userId: userData._id, // FIX HERE
-            courseId: courseId,
-            purchaseStatus: "pending",
-            stripeSessionId: stripeSession.id,
-        });
-
-        res.json({
+        // 8️⃣ Send Stripe URL to frontend
+        return res.json({
             success: true,
-            url: stripeSession.url,
+            url: session.url,
         });
 
     } catch (error) {
         console.error("❌ purchaseCourse error:", error);
-        res.json({ success: false, message: error.message });
+        return res.json({ success: false, message: error.message });
     }
 };
+
 
 
 

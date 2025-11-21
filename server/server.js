@@ -9,9 +9,10 @@ import connectClodinary from './config/Cloudnary.js';
 import { protextEducator } from './middlewares/authMiddleware.js';
 import courseRouter from './routes/coursseRoute.js';
 import userRouter from './routes/userRoutes.js';
+import dotenv from "dotenv";
 
 const app = express();
-
+dotenv.config();
 // 🧠 Connect to MongoDB and Cloudinary
 await mongoosedb().catch(console.error);
 await connectClodinary().catch(console.error);
