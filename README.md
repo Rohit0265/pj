@@ -1,10 +1,1 @@
-sometyhung
-dhgbfhf
-erqtgwerg
-xdfggg
-xdfbdg
-dghrth
-hghgh
-fghh
-ghdfgh
-hghghfg
+Basic go project
